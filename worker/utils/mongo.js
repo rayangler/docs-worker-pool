@@ -130,6 +130,45 @@ module.exports = {
     }
   },
 
+  // Updates the status to be inQueue
+  async resetJobForReenqueue(queueCollection, job) {
+    const query = { _id: job._id };
+    const reenqueueMessage = 'Job restarted due to server shutdown.';
+
+    const update = {
+      $set: {
+        startTime: null,
+        status: 'inQueue',
+        error: {},
+        logs: [reenqueueMessage],
+      }
+    };
+
+    const updateResult = await queueCollection.updateOne(query, update);
+    if (updateResult.result.n < 1) {
+      throw new Error(`Failed to update job (${job._id}) in queue during re-enqueue operation`);
+    }
+  },
+
+  async updateJobWithPurgedURLs(currentJob, urlArray) {
+    const queueCollection = module.exports.getCollection();
+    if (queueCollection) {
+      const query = { _id: currentJob._id };
+      const update = {
+        $push: { ['purgedURLs']: urlArray },
+      };
+
+      try {
+        await queueCollection.updateOne(query, update);
+      } catch (err) {
+        console.log(`Error in updateJobWithPurgedURLs(): ${err}`);
+        throw err
+      }
+    } else {
+      console.log('Error in logInMongo(): queueCollection does not exist');
+    }
+  },
+  
   // Adds Log Message To Job In The Queue
   async logMessageInMongo(currentJob, message) {
     const queueCollection = module.exports.getCollection();

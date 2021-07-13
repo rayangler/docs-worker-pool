@@ -50,3 +50,32 @@ npm install --dev
 ```
 
 See the [spec doc](https://docs.google.com/document/d/1XZOuuGmozcLQRSDitx0UWhZzJaS4opR1JVwZqDp-N4g/edit?usp=sharing) for more details.
+
+## Branches
+Development in this repository can be done via forks or branches. Currently, we support a `master` branch and `meta` branch. In general, the development workflow is to open pull requests against `master`, and to test `master` prior to creating new tags for a release.
+
+In general, the git workflow within this repository loosely follows https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow .
+
+### Meta
+`meta` contains various makefiles and .yaml files used for configuration.
+Changes or additions to/of makefiles and .yaml for publishing purposes should be performed against this branch.
+There is no general requirement to keep `meta` up to date with `master` or `integration`.
+
+### Master
+`master` is treated as a running pre-production feature branch. Changes should not go into master until properly tested for regressions in an acceptance environment. It is an expectation that hotfixes may have to occur on occasion - on such an occasion, a feature branch should be made from the commit hash of the last release tag, and not from the head of master. Master may contain changes that have yet to be fully tested for a production release.
+
+### Release Tags
+Each release tag represents a presumptive stable release - with the most recent release tag representing the current state of our production environment.
+
+## Release Process
+docs-worker-pool contains various triggers for release to higher environments. Currently, the repository supports an integration environment (reflecting the state of the master branch) and a production environment (reflecting the state of the most recent release tag). 
+
+### Integration Environment
+ - Merge a pull request or otherwise push a commit to `master` branch. 
+ - Verify that the deploy-integration-ec2 workflow has executed successfully.
+
+### Production Environment
+ - Rebase `master` with `integration` and push the latest changes, or merge a pull request to `master` if performing a hotfix.
+ - If you don't have push access, open an issue or otherwise contact a contributor with administrator priveliges. 
+ - Create release tags. We currently follow [semver](https://semver.org/) standards.
+ - Verify that the deploy-production-ec2 workflow executed successfully for both job runs across both production instances.

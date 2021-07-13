@@ -72,10 +72,6 @@ class GitHubJobClass {
           }
 
         }
-        // server staging commit jobs
-        else if(this.currentJob.payload.patch && this.currentJob.payload.patchType === 'commit'){ 
-          pathPrefix = `${repoContent.content.prefix}/${this.currentJob.user}/${this.currentJob.payload.localBranchName}/${server_user}/${this.currentJob.payload.branchName}`; 
-        }
         //mut only expects prefix or prefix/version for versioned repos, have to remove server user from staging prefix
         if(typeof pathPrefix !== 'undefined' && pathPrefix !== null){
           this.currentJob.payload.pathPrefix = pathPrefix;
@@ -326,6 +322,11 @@ class GitHubJobClass {
       // thus why the series of makefile targets are slightly different btwn prod and staging jobs
       if (this.buildNextGen() && !isProdDeployJob) {
         commandsToBuild[commandsToBuild.length - 1] = 'make next-gen-html';
+        //tell Gatsby to pull in draft data from CMS
+        //TODO: this stanza can be removed when devhub is entirely off autobuilder
+        if (this.currentJob.payload.repoName === 'devhub-content-integration') {
+            commandsToBuild[commandsToBuild.length - 1] += ` STRAPI_PUBLICATION_STATE=preview`;
+          }
       }
 
       //check if prod deploy job
