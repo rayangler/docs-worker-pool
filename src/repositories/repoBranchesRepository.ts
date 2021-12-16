@@ -19,6 +19,14 @@ export class RepoBranchesRepository extends BaseRepository<Job> {
                 repoName: reposObject.repoName,
                 status: 'success'
             }
+        }
+    }
+
+    async getRepoBranchesByRepoName(repoName: string): Promise<any> {
+        const query = { 'repoName': repoName };
+        const repoDetails = await this.findOne(query, `Mongo Timeout Error: Timedout while retrieving Repoinformation for ${repoName}`);
+        if (repoDetails && repoDetails.bucket && repoDetails.url) {
+            return repoDetails
         } else {
             return { status: 'failure' };
         }

@@ -22,12 +22,12 @@ let githubCommandExecutor: GithubCommandExecutor;
 let jobRepository: JobRepository;
 let hybridJobLogger: HybridJobLogger;
 let repoEntitlementRepository: RepoEntitlementsRepository;
-let repoBranchesRepository: RepoBranchesRepository;
 let jobValidator: JobValidator;
 let cdnConnector: FastlyConnector;
 let repoConnector: GitHubConnector;
 let jobHandletFactory: JobHandlerFactory;
 let jobManager: JobManager;
+let repoBranchesRepository: RepoBranchesRepository
 
 async function init(): Promise<void> {
   let client = new mongodb.MongoClient(c.get("dbUrl"));

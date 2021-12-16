@@ -33,6 +33,8 @@ Resources:
             - ContainerPort: ${self:custom.ecs.port}
               Protocol: tcp
           Environment:
+            - Name: STAGE
+              value: ${self:provider.stage}
             - Name: SNOOTY_ENV
               Value: ${self:custom.env.${self:provider.stage}}
             - Name: MONGO_ATLAS_USERNAME

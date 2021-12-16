@@ -3,18 +3,20 @@ import { CDNCreds } from "../entities/creds";
 import { IJob } from "../entities/job";
 import { InvalidJobError } from "../errors/errors";
 import { JobRepository } from "../repositories/jobRepository";
+import { RepoBranchesRepository } from "../repositories/repoBranchesRepository";
 import { ICDNConnector } from "../services/cdn";
 import { CommandExecutorResponse, IJobCommandExecutor } from "../services/commandExecutor";
 import { IFileSystemServices } from "../services/fileServices";
 import { IJobRepoLogger } from "../services/logger";
 import { IRepoConnector } from "../services/repo";
 import { JobHandler } from "./jobHandler";
+import { IJobValidator } from "./jobValidator";
 
 export class ProductionJobHandler extends JobHandler {
 
     constructor(job: IJob, config: IConfig, jobRepository: JobRepository, fileSystemServices: IFileSystemServices, commandExecutor: IJobCommandExecutor,
-        cdnConnector: ICDNConnector, repoConnector: IRepoConnector, logger: IJobRepoLogger) {
-        super(job, config, jobRepository, fileSystemServices, commandExecutor, cdnConnector, repoConnector, logger);
+        cdnConnector: ICDNConnector, repoConnector: IRepoConnector, logger: IJobRepoLogger, validator:IJobValidator, repoBranchesRepo: RepoBranchesRepository) {
+        super(job, config, jobRepository, fileSystemServices, commandExecutor, cdnConnector, repoConnector, logger, validator, repoBranchesRepo);
         this.name = "Production";
     }
     prepDeployCommands(): void {
@@ -28,8 +30,7 @@ export class ProductionJobHandler extends JobHandler {
             const manifestPrefix = this.currJob.payload.manifestPrefix;
             this.currJob.deployCommands[this.currJob.deployCommands.length - 1] = `make next-gen-deploy MUT_PREFIX=${this.currJob.payload.mutPrefix}`;
             if (manifestPrefix) {
-              const searchFlag = this.currJob.payload.includeInGlobalSearch === true ? "-g" : ""
-              this.currJob.deployCommands[this.currJob.deployCommands.length - 1] += ` MANIFEST_PREFIX=${manifestPrefix} GLOBAL_SEARCH_FLAG=${searchFlag}`;
+                this.currJob.deployCommands[this.currJob.deployCommands.length - 1] += ` MANIFEST_PREFIX=${manifestPrefix} GLOBAL_SEARCH_FLAG=${this.currJob.payload.stableBranch}`;
             }
         }
     }
@@ -43,7 +44,8 @@ export class ProductionJobHandler extends JobHandler {
 
     async constructManifestIndexPath(): Promise<void> {
         try {
-            this.currJob.payload.manifestPrefix = this.currJob.payload.project + '-' + this.currJob.payload.urlSlug;
+            const {output} = await this.commandExecutor.getSnootyProjectName(this.currJob.payload.repoName);
+            this.currJob.payload.manifestPrefix = output + '-' + (this.currJob.payload.alias ? this.currJob.payload.alias : this.currJob.payload.branchName);
         } catch (error) {
             await this.logger.save(this.currJob._id, error)
             throw error
@@ -52,9 +54,14 @@ export class ProductionJobHandler extends JobHandler {
 
     async getPathPrefix(): Promise<string> {
         try {
-          let pathPrefix = ""
-          pathPrefix = `${this.currJob.payload.prefix}/{$this.currJob.payload.urlSlug}`;
-          return pathPrefix;
+            let pathPrefix = ""
+            if (this.currJob.payload.publishedBranches && this.currJob.payload.publishedBranches.version.active.length > 1) {
+                pathPrefix = `${this.currJob.payload.publishedBranches.prefix}/${this.currJob.payload.alias ? this.currJob.payload.alias : this.currJob.payload.branchName}`;
+            }
+            else {
+                pathPrefix = `${this.currJob.payload.alias ? this.currJob.payload.alias : this.currJob.payload.publishedBranches.prefix}`;
+            }
+            return pathPrefix;
         } catch (error) {
             await this.logger.save(this.currJob._id, error)
             throw new InvalidJobError(error.message)
@@ -91,10 +98,12 @@ export class ProductionJobHandler extends JobHandler {
     async deploy(): Promise<CommandExecutorResponse> {
         let resp = await this.deployGeneric();
         try {
-            const makefileOutput = resp.output.replace(/\r/g, '').split(/\n/);
-            await this.purgePublishedContent(makefileOutput);
-            await this.logger.save(this.currJob._id, `${'(prod)'.padEnd(15)}Finished pushing to production`);
-            await this.logger.save(this.currJob._id, `${'(prod)'.padEnd(15)}Deploy details:\n\n${resp.output}`);
+            if (resp && resp.output) {
+                const makefileOutput = resp.output.replace(/\r/g, '').split(/\n/);
+                await this.purgePublishedContent(makefileOutput);
+                await this.logger.save(this.currJob._id, `${'(prod)'.padEnd(15)}Finished pushing to production`);
+                await this.logger.save(this.currJob._id, `${'(prod)'.padEnd(15)}Deploy details:\n\n${resp.output}`);
+            }
             return resp;
         } catch (errResult) {
             await this.logger.save(this.currJob._id, `${'(prod)'.padEnd(15)}stdErr: ${errResult.stderr}`);
